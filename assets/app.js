@@ -1,8 +1,8 @@
 /* Elden Ring — Ultimate Region Tracker
  * One save file -> per-region view of items (with where-to-find), bosses and graces.
- * Save parsing reuses the proven logic from the two original apps:
- *  - inventory ids  (root app: get_slot_ls / getInventory / getIdReversed)
- *  - event flags    (checklist app: getEventFlags + bit-test math)  -> bosses / graces / cookbooks ...
+ * Save parsing extracts two things from the .sl2:
+ *  - inventory ids  (get_slot_ls / getInventory / getIdReversed)  -> items
+ *  - event flags    (getEventFlags + bit-test math)               -> bosses / graces / cookbooks ...
  */
 
 // ---------- data source paths (app lives at the project root) ----------
@@ -19,7 +19,7 @@ const UI = { filter:"all", sort:"default", q:"", reveal:true,
              base:true, dlc:true };
 
 /* =====================================================================
- *  SAVE FILE PARSING  (ported verbatim from the original trackers)
+ *  SAVE FILE PARSING
  * ===================================================================== */
 const INV_PATTERN     = new Uint8Array([0xB0,0xAD,0x01,0x00,0x01,0xFF,0xFF,0xFF]);
 const INV_PATTERN_DLC = new Uint8Array([0xB0,0xAD,0x01,0x00,0x01]);

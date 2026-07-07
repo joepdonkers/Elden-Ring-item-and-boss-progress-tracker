@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Elden Ring — Ultimate Region Tracker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <header class="site-head">
+    <h1>Elden Ring · Ultimate Region Tracker</h1>
+    <p class="tagline">Upload your save and see, region by region, exactly what's left to do — items, bosses and sites of grace — and where to find it.</p>
+  </header>
+
+  <!-- ============ UPLOAD ============ -->
+  <section id="uploadSection" class="panel">
+    <div class="upload-row">
+      <label class="file-btn">
+        <input type="file" id="savefile" accept=".sl2,.co2" hidden />
+        <span>Choose save file (ER0000.sl2)</span>
+      </label>
+      <div id="slotWrap" class="slot-wrap" hidden>
+        <label for="slotSelect">Character slot</label>
+        <select id="slotSelect"></select>
+        <button id="calculate" class="go-btn" hidden>Analyze ▸</button>
+      </div>
+    </div>
+    <p class="hint-line">Your save is read <strong>entirely in your browser</strong> — nothing is uploaded anywhere. Find it at
+      <code>%AppData%\EldenRing\&lt;id&gt;\ER0000.sl2</code>.</p>
+    <p id="loadError" class="error" hidden></p>
+  </section>
+
+  <!-- ============ CONTROLS ============ -->
+  <section id="controls" class="panel controls" hidden>
+    <div class="overall">
+      <div class="overall-num" id="overallPct">0%</div>
+      <div class="overall-meta">
+        <div id="charName" class="char-name"></div>
+        <div class="bar"><div id="overallBar" class="bar-fill"></div></div>
+        <div id="overallCounts" class="muted small"></div>
+      </div>
+    </div>
+
+    <div class="ctrl-grid">
+      <div class="ctrl">
+        <span class="ctrl-label">Show</span>
+        <label class="chk"><input type="checkbox" id="tglBase" checked /> Base game</label>
+        <label class="chk"><input type="checkbox" id="tglDlc" checked /> Shadow of the Erdtree</label>
+      </div>
+      <div class="ctrl">
+        <span class="ctrl-label">Categories</span>
+        <label class="chk"><input type="checkbox" id="tglBosses" checked /> Bosses</label>
+        <label class="chk"><input type="checkbox" id="tglGraces" checked /> Graces</label>
+        <label class="chk"><input type="checkbox" id="tglItems" checked /> Items</label>
+      </div>
+      <div class="ctrl">
+        <span class="ctrl-label">Filter</span>
+        <select id="filterSel">
+          <option value="all">Everything</option>
+          <option value="todo">To-do only</option>
+          <option value="done">Completed only</option>
+        </select>
+      </div>
+      <div class="ctrl">
+        <span class="ctrl-label">Sort</span>
+        <select id="sortSel">
+          <option value="default">Default (by area)</option>
+          <option value="name">Name A–Z</option>
+          <option value="status">Status (to-do first)</option>
+        </select>
+      </div>
+      <div class="ctrl grow">
+        <span class="ctrl-label">Search</span>
+        <input type="search" id="searchBox" placeholder="Filter by name…" />
+      </div>
+      <div class="ctrl">
+        <button id="expandAll" class="mini">Expand all</button>
+        <button id="collapseAll" class="mini">Collapse all</button>
+        <label class="chk" title="Reveal names & hints of things you don't have"><input type="checkbox" id="tglReveal" checked /> Reveal missing</label>
+      </div>
+    </div>
+  </section>
+
+  <main id="results"></main>
+
+  <footer class="site-foot">
+    <p>Built on the data of the two original trackers. Boss locations are best-effort and easy to edit in
+      <code>ultimate-tracker/data/boss_meta.json</code>. Item links go to the Fextralife wiki.</p>
+  </footer>
+
+  <script src="assets/app.js"></script>
+</body>
+</html>

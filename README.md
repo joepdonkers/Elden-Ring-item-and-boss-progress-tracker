@@ -7,7 +7,16 @@ tears and quantifiable collectibles.
 
 ## Running it
 
-It's a static site. Serve this folder and open it in a browser:
+### Easiest (Windows)
+
+**Double-click `start.bat`.** It launches a small local web server and opens the tracker in your
+default browser automatically. Keep the little black window open while you use it, and close it when
+you're done. (Requires [Python](https://www.python.org/downloads/) — during install, tick
+*"Add Python to PATH"*.)
+
+### Manual (any OS)
+
+It's a static site, so you can also serve this folder yourself:
 
 ```bash
 python -m http.server 8000
@@ -21,6 +30,7 @@ Everything runs in your browser — the save file is never uploaded anywhere. Fi
 ## Layout
 
 ```
+start.bat             – double-click launcher (starts the server + opens the browser)
 index.html            – the app
 assets/app.js         – save parsing + model + rendering (vanilla JS, no dependencies)
 assets/style.css      – styling

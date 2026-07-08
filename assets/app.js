@@ -14,9 +14,43 @@ let FILE_BUF = null;          // ArrayBuffer of the whole save
 let DB = {};                  // all loaded json
 let MODEL = null;             // assembled { regions:{}, misc:{}, collectibles:[] }
 let isDlcFile = false;        // set during inventory parse (8 vs 16 byte chunks)
+let FILE_HANDLE = null;       // FileSystemFileHandle of the chosen save (Chrome/Edge only)
 const UI = { filter:"all", sort:"default", q:"", reveal:true,
              cats:{bosses:true, graces:true, items:true},
              base:true, dlc:true };
+
+/* =====================================================================
+ *  SAVE FILE HANDLE PERSISTENCE (IndexedDB, so the picked file survives restarts)
+ * ===================================================================== */
+const IDB_NAME="er-tracker", IDB_STORE="handles", HANDLE_KEY="savefile";
+const LS_SLOT_KEY="er-tracker-lastSlot";
+const supportsFSAccess = "showOpenFilePicker" in window;
+
+function idbOpen(){
+  return new Promise((resolve,reject)=>{
+    const req=indexedDB.open(IDB_NAME,1);
+    req.onupgradeneeded=()=>req.result.createObjectStore(IDB_STORE);
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function idbGet(key){
+  const db=await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const req=db.transaction(IDB_STORE,"readonly").objectStore(IDB_STORE).get(key);
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+}
+async function idbSet(key,val){
+  const db=await idbOpen();
+  return new Promise((resolve,reject)=>{
+    const tx=db.transaction(IDB_STORE,"readwrite");
+    tx.objectStore(IDB_STORE).put(val,key);
+    tx.oncomplete=()=>resolve();
+    tx.onerror=()=>reject(tx.error);
+  });
+}
 
 /* =====================================================================
  *  SAVE FILE PARSING
@@ -452,13 +486,19 @@ function render(){
  * ===================================================================== */
 function showError(msg){ const e=el("loadError"); e.textContent=msg; e.hidden=false; }
 
-async function onFile(){
-  const f=el("savefile").files[0];
-  if(!f) return;
+function setFileButtonState(state,name){
+  const label=el("chooseFileLabel");
+  if(state==="loaded") label.textContent=`✔ ${name} — click to change`;
+  else if(state==="reconnect") label.textContent=`Reconnect save file (${name})`;
+  else label.textContent="Choose save file (ER0000.sl2)";
+}
+
+/* parses the raw save bytes and (re)builds the character-slot dropdown */
+async function loadFile(f){
   el("loadError").hidden=true;
   const buf=await f.arrayBuffer();
   if(!buffer_equal(buf.slice(0,4), new Int8Array([66,78,68,52]))){
-    showError("That doesn't look like a valid Elden Ring save (missing BND4 header)."); return;
+    showError("That doesn't look like a valid Elden Ring save (missing BND4 header)."); return false;
   }
   FILE_BUF=buf;
   const names=getNames(buf);
@@ -470,11 +510,82 @@ async function onFile(){
     sel.appendChild(o);
   });
   el("slotWrap").hidden=false;
+  return true;
+}
+
+async function onFile(){
+  const f=el("savefile").files[0];
+  if(!f) return;
+  const ok=await loadFile(f);
+  if(!ok) return;
+  setFileButtonState("loaded",f.name);
   el("calculate").hidden=true;
   el("charName").textContent="";
 }
 
-async function onCalculate(){
+/* re-selects a previously analyzed slot (if still valid) and re-analyzes it */
+async function reselectSlot(slotValue){
+  if(slotValue===null || slotValue===undefined) return;
+  const sel=el("slotSelect");
+  const opt=[...sel.options].find(o=>o.value===String(slotValue));
+  if(!opt || opt.disabled) return;
+  sel.value=String(slotValue);
+  el("calculate").hidden=false;
+  await onCalculate(false);
+}
+
+async function onChooseFileClick(){
+  if(!supportsFSAccess){ el("savefile").click(); return; }
+  try{
+    if(FILE_HANDLE){
+      const perm=await FILE_HANDLE.requestPermission({mode:"read"});
+      if(perm==="granted"){
+        const file=await FILE_HANDLE.getFile();
+        const ok=await loadFile(file);
+        if(ok){ setFileButtonState("loaded",file.name); el("calculate").hidden=true; el("charName").textContent=""; }
+        return;
+      }
+    }
+    const [handle]=await window.showOpenFilePicker({
+      types:[{ description:"Elden Ring save", accept:{ "application/octet-stream":[".sl2",".co2"] } }]
+    });
+    FILE_HANDLE=handle;
+    await idbSet(HANDLE_KEY,handle);
+    const file=await handle.getFile();
+    const ok=await loadFile(file);
+    if(ok){ setFileButtonState("loaded",file.name); el("calculate").hidden=true; el("charName").textContent=""; }
+  }catch(err){
+    if(err.name!=="AbortError"){ console.error(err); showError("Couldn't open the save file: "+err.message); }
+  }
+}
+
+/* re-reads the save from disk (via the remembered handle, or the last picked File) and
+ * refreshes the currently analyzed slot instantly, without needing to click Analyze again */
+async function onRefresh(){
+  const prevSlot=el("slotSelect").value;
+  try{
+    let file;
+    if(FILE_HANDLE){
+      let perm=await FILE_HANDLE.queryPermission({mode:"read"});
+      if(perm!=="granted") perm=await FILE_HANDLE.requestPermission({mode:"read"});
+      if(perm!=="granted"){ showError("Permission to re-read the save file was denied."); return; }
+      file=await FILE_HANDLE.getFile();
+    }else if(el("savefile").files[0]){
+      file=el("savefile").files[0];
+    }else{
+      showError("No save file loaded yet — choose a save file first."); return;
+    }
+    const ok=await loadFile(file);
+    if(!ok) return;
+    setFileButtonState("loaded",file.name);
+    await reselectSlot(prevSlot);
+  }catch(err){
+    console.error(err);
+    showError("Failed to refresh the save file: "+err.message);
+  }
+}
+
+async function onCalculate(scroll=true){
   const slotIndex=+el("slotSelect").value;
   if(Number.isNaN(slotIndex)) return;
   el("calculate").textContent="Reading…";
@@ -485,7 +596,8 @@ async function onCalculate(){
     el("controls").hidden=false;
     el("charName").textContent=el("slotSelect").selectedOptions[0].textContent;
     render();
-    el("controls").scrollIntoView({behavior:"smooth"});
+    localStorage.setItem(LS_SLOT_KEY,String(slotIndex));
+    if(scroll) el("controls").scrollIntoView({behavior:"smooth"});
   }catch(err){
     console.error(err);
     showError("Failed to read this save slot: "+err.message);
@@ -494,8 +606,32 @@ async function onCalculate(){
   }
 }
 
+/* on startup, silently reconnect to a previously chosen save file (Chrome/Edge only —
+ * relies on the File System Access API's persistable FileSystemFileHandle) */
+async function autoLoadOnStart(){
+  if(!supportsFSAccess) return;
+  let handle;
+  try{ handle=await idbGet(HANDLE_KEY); }catch{ return; }
+  if(!handle) return;
+  FILE_HANDLE=handle;
+  const perm=await handle.queryPermission({mode:"read"});
+  if(perm!=="granted"){ setFileButtonState("reconnect",handle.name); return; }
+  try{
+    const file=await handle.getFile();
+    const ok=await loadFile(file);
+    if(!ok) return;
+    setFileButtonState("loaded",file.name);
+    await reselectSlot(localStorage.getItem(LS_SLOT_KEY));
+  }catch(err){
+    console.error(err);
+    setFileButtonState("reconnect",handle.name);
+  }
+}
+
 function wire(){
+  el("chooseFileBtn").addEventListener("click",onChooseFileClick);
   el("savefile").addEventListener("change",onFile);
+  el("refreshBtn").addEventListener("click",onRefresh);
   el("slotSelect").addEventListener("change",()=>{ el("calculate").hidden=false; });
   el("calculate").addEventListener("click",onCalculate);
 
@@ -513,4 +649,4 @@ function wire(){
   el("expandAll").addEventListener("click",()=>document.querySelectorAll(".region").forEach(r=>r.classList.add("open")));
   el("collapseAll").addEventListener("click",()=>document.querySelectorAll(".region").forEach(r=>r.classList.remove("open")));
 }
-document.addEventListener("DOMContentLoaded",wire);
+document.addEventListener("DOMContentLoaded",()=>{ wire(); autoLoadOnStart(); });

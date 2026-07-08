@@ -448,17 +448,31 @@ function render(){
 }
 
 /* =====================================================================
- *  WIRING
+ *  FILE HANDLING  (live re-read via the File System Access API when available)
  * ===================================================================== */
+const HAS_FS = "showOpenFilePicker" in window;   // Chrome / Edge
+let fileHandle = null;                            // FileSystemFileHandle we can re-read
+
 function showError(msg){ const e=el("loadError"); e.textContent=msg; e.hidden=false; }
 
-async function onFile(){
-  const f=el("savefile").files[0];
-  if(!f) return;
+// --- tiny IndexedDB store so the picked file survives a page reload ---
+const IDB_NAME="er-tracker", IDB_STORE="handles", IDB_KEY="saveFile";
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(IDB_NAME,1);
+    r.onupgradeneeded=()=>r.result.createObjectStore(IDB_STORE);
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
+  });
+}
+async function idbSet(v){ try{ const db=await idbOpen(); await new Promise((res,rej)=>{const tx=db.transaction(IDB_STORE,"readwrite");tx.objectStore(IDB_STORE).put(v,IDB_KEY);tx.oncomplete=res;tx.onerror=()=>rej(tx.error);}); }catch(e){/* private mode etc. */} }
+async function idbGet(){ try{ const db=await idbOpen(); return await new Promise((res,rej)=>{const tx=db.transaction(IDB_STORE,"readonly");const rq=tx.objectStore(IDB_STORE).get(IDB_KEY);rq.onsuccess=()=>res(rq.result);rq.onerror=()=>rej(rq.error);}); }catch(e){ return null; } }
+
+// validate + read a File into FILE_BUF and populate the slot dropdown
+async function ingestFile(file){
   el("loadError").hidden=true;
-  const buf=await f.arrayBuffer();
+  const buf=await file.arrayBuffer();
   if(!buffer_equal(buf.slice(0,4), new Int8Array([66,78,68,52]))){
-    showError("That doesn't look like a valid Elden Ring save (missing BND4 header)."); return;
+    showError("That doesn't look like a valid Elden Ring save (missing BND4 header)."); return false;
   }
   FILE_BUF=buf;
   const names=getNames(buf);
@@ -472,6 +486,36 @@ async function onFile(){
   el("slotWrap").hidden=false;
   el("calculate").hidden=true;
   el("charName").textContent="";
+  return true;
+}
+
+// pick a file via the File System Access API (keeps a re-readable handle)
+async function pickFile(){
+  try{
+    const [h]=await window.showOpenFilePicker({
+      types:[{description:"Elden Ring save",accept:{"application/octet-stream":[".sl2",".co2"]}}],
+    });
+    fileHandle=h;
+    await idbSet(h);
+    await ingestFile(await h.getFile());
+  }catch(err){
+    if(err && err.name==="AbortError") return;   // user cancelled the dialog
+    console.error(err); showError("Could not open file: "+err.message);
+  }
+}
+
+// re-read the previously picked file after a page reload (needs a permission click)
+async function reloadLast(){
+  try{
+    const h=await idbGet(); if(!h) return;
+    if(h.queryPermission){
+      let p=await h.queryPermission({mode:"read"});
+      if(p!=="granted") p=await h.requestPermission({mode:"read"});
+      if(p!=="granted"){ showError("Permission to read the file was denied."); return; }
+    }
+    fileHandle=h;
+    await ingestFile(await h.getFile());
+  }catch(err){ console.error(err); showError("Could not reload the last save: "+err.message); }
 }
 
 async function onCalculate(){
@@ -480,22 +524,55 @@ async function onCalculate(){
   el("calculate").textContent="Reading…";
   try{
     if(!DB.region_map) await loadAll();
-    const parsed=parseSlot(slotIndex);
-    buildModel(parsed);
+    buildModel(parseSlot(slotIndex));
     el("controls").hidden=false;
     el("charName").textContent=el("slotSelect").selectedOptions[0].textContent;
+    // the "Refresh from disk" control only works when we have a live handle
+    el("refreshCtrl").hidden=!fileHandle;
     render();
     el("controls").scrollIntoView({behavior:"smooth"});
   }catch(err){
-    console.error(err);
-    showError("Failed to read this save slot: "+err.message);
+    console.error(err); showError("Failed to read this save slot: "+err.message);
   }finally{
     el("calculate").textContent="Analyze ▸";
   }
 }
 
-function wire(){
-  el("savefile").addEventListener("change",onFile);
+// re-read the live file from disk and update the view in place
+async function onRefresh(){
+  if(!fileHandle) return;
+  const slotIndex=+el("slotSelect").value;
+  if(Number.isNaN(slotIndex)) return;
+  const btn=el("refreshBtn"), label="↻ Refresh from disk";
+  btn.disabled=true; btn.textContent="↻ Reading…";
+  try{
+    if(fileHandle.queryPermission){
+      let p=await fileHandle.queryPermission({mode:"read"});
+      if(p!=="granted") p=await fileHandle.requestPermission({mode:"read"});
+      if(p!=="granted") throw new Error("read permission denied");
+    }
+    const file=await fileHandle.getFile();
+    const buf=await file.arrayBuffer();
+    if(!buffer_equal(buf.slice(0,4), new Int8Array([66,78,68,52]))) throw new Error("file is no longer a valid save");
+    FILE_BUF=buf;
+    buildModel(parseSlot(slotIndex));
+    render();   // keeps expanded regions + current filters
+    const d=new Date(file.lastModified);
+    el("refreshedAt").textContent="last save: "+d.toLocaleTimeString();
+    btn.textContent="✓ Updated"; setTimeout(()=>{btn.textContent=label;},1200);
+  }catch(err){
+    console.error(err); showError("Refresh failed: "+err.message); btn.textContent=label;
+  }finally{ btn.disabled=false; }
+}
+
+/* =====================================================================
+ *  WIRING
+ * ===================================================================== */
+async function wire(){
+  el("pickBtn").addEventListener("click",()=> HAS_FS ? pickFile() : el("savefile").click());
+  el("savefile").addEventListener("change",()=>{ const f=el("savefile").files[0]; if(f){ fileHandle=null; ingestFile(f); } });
+  el("reloadLast").addEventListener("click",reloadLast);
+  el("refreshBtn").addEventListener("click",onRefresh);
   el("slotSelect").addEventListener("change",()=>{ el("calculate").hidden=false; });
   el("calculate").addEventListener("click",onCalculate);
 
@@ -512,5 +589,8 @@ function wire(){
   });
   el("expandAll").addEventListener("click",()=>document.querySelectorAll(".region").forEach(r=>r.classList.add("open")));
   el("collapseAll").addEventListener("click",()=>document.querySelectorAll(".region").forEach(r=>r.classList.remove("open")));
+
+  // offer a one-click reload if we stored a handle in a previous session
+  if(HAS_FS){ const h=await idbGet(); if(h){ el("reloadLast").hidden=false; } }
 }
 document.addEventListener("DOMContentLoaded",wire);

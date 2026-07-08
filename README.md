@@ -27,6 +27,16 @@ Then open <http://localhost:8000/>.
 Everything runs in your browser — the save file is never uploaded anywhere. Find your save at
 `%AppData%\EldenRing\<id>\ER0000.sl2`.
 
+## Updating as you play (Refresh)
+
+In **Chrome or Edge**, once you've picked your save a **↻ Refresh from disk** button appears in the
+controls bar. After the game writes a new save (rest at a grace, quit to menu, etc.), click it and
+the view updates in place — no need to re-open the file. Your expanded regions and filters stay put.
+The chosen file is also remembered, so on your next visit a **↻ Reload last save** button lets you
+jump back in with one click (the browser asks once for read permission).
+
+Firefox and Safari don't support this API yet, so there you'll re-pick the file to update.
+
 ## Layout
 
 ```

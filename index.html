@@ -17,10 +17,9 @@
   <!-- ============ UPLOAD ============ -->
   <section id="uploadSection" class="panel">
     <div class="upload-row">
-      <label class="file-btn">
-        <input type="file" id="savefile" accept=".sl2,.co2" hidden />
-        <span>Choose save file (ER0000.sl2)</span>
-      </label>
+      <button id="pickBtn" class="file-btn">Choose save file (ER0000.sl2)</button>
+      <input type="file" id="savefile" accept=".sl2,.co2" hidden />
+      <button id="reloadLast" class="file-btn alt" hidden>↻ Reload last save</button>
       <div id="slotWrap" class="slot-wrap" hidden>
         <label for="slotSelect">Character slot</label>
         <select id="slotSelect"></select>
@@ -79,6 +78,11 @@
         <button id="expandAll" class="mini">Expand all</button>
         <button id="collapseAll" class="mini">Collapse all</button>
         <label class="chk" title="Reveal names & hints of things you don't have"><input type="checkbox" id="tglReveal" checked /> Reveal missing</label>
+      </div>
+      <div class="ctrl" id="refreshCtrl" hidden>
+        <span class="ctrl-label">Live save</span>
+        <button id="refreshBtn" class="mini refresh" title="Re-read the save file from disk and update the view">↻ Refresh from disk</button>
+        <span id="refreshedAt" class="muted small"></span>
       </div>
     </div>
   </section>

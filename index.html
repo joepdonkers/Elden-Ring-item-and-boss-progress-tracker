@@ -17,17 +17,18 @@
   <!-- ============ UPLOAD ============ -->
   <section id="uploadSection" class="panel">
     <div class="upload-row">
-      <button type="button" id="chooseFileBtn" class="file-btn"><span id="chooseFileLabel">Choose save file (ER0000.sl2)</span></button>
-      <input type="file" id="savefile" accept=".sl2,.co2" hidden />
+      <label class="file-btn">
+        <input type="file" id="savefile" accept=".sl2,.co2" hidden />
+        <span>Choose save file (ER0000.sl2)</span>
+      </label>
       <div id="slotWrap" class="slot-wrap" hidden>
         <label for="slotSelect">Character slot</label>
         <select id="slotSelect"></select>
         <button id="calculate" class="go-btn" hidden>Analyze ▸</button>
-        <button type="button" id="refreshBtn" class="mini" title="Re-read the save file from disk">⟳ Refresh</button>
       </div>
     </div>
     <p class="hint-line">Your save is read <strong>entirely in your browser</strong> — nothing is uploaded anywhere. Find it at
-      <code>%AppData%\EldenRing\&lt;id&gt;\ER0000.sl2</code>. On Chrome/Edge, the app remembers your file so you won't need to re-select it next launch.</p>
+      <code>%AppData%\EldenRing\&lt;id&gt;\ER0000.sl2</code>.</p>
     <p id="loadError" class="error" hidden></p>
   </section>
 

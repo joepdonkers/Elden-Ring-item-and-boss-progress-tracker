@@ -14,7 +14,7 @@ let FILE_BUF = null;          // ArrayBuffer of the whole save
 let DB = {};                  // all loaded json
 let MODEL = null;             // assembled { regions:{}, misc:{}, collectibles:[] }
 let isDlcFile = false;        // set during inventory parse (8 vs 16 byte chunks)
-const UI = { filter:"all", sort:"default", q:"", reveal:true,
+const UI = { filter:"all", sort:"default", q:"", reveal:true, auto:false,
              cats:{bosses:true, graces:true, items:true},
              base:true, dlc:true };
 
@@ -454,6 +454,9 @@ const HAS_FS = "showOpenFilePicker" in window;   // Chrome / Edge
 let fileHandle = null;                            // FileSystemFileHandle we can re-read
 let helperPath = null;                            // save path served by the local Python helper
 let helperSaves = [];                             // saves reported by GET /api/saves
+let lastMtime = 0;                                // last-seen save modified time (for auto-refresh)
+let autoTimer = null;                             // auto-refresh polling interval
+let refreshing = false;                           // guard against overlapping refreshes
 
 function showError(msg){ const e=el("loadError"); e.textContent=msg; e.hidden=false; }
 
@@ -563,6 +566,7 @@ async function onCalculate(){
     // "Refresh from disk" works when we have a live source (helper OR file handle)
     el("refreshCtrl").hidden=!(helperPath||fileHandle);
     render();
+    await markLoaded();
     el("controls").scrollIntoView({behavior:"smooth"});
   }catch(err){
     console.error(err); showError("Failed to read this save slot: "+err.message);
@@ -585,27 +589,59 @@ async function currentBytes(){
   return null;
 }
 
-// re-read the live save and update the view in place
-async function onRefresh(){
+// cheap check of the save's modified time (no full read) — for auto-refresh
+async function saveStat(){
+  try{
+    if(helperPath){
+      const r=await fetch("/api/stat?path="+encodeURIComponent(helperPath),{cache:"no-store"});
+      if(!r.ok) return null;
+      return (await r.json()).mtime||null;
+    }
+    if(fileHandle) return (await fileHandle.getFile()).lastModified||null;
+  }catch(e){/* ignore */}
+  return null;
+}
+async function markLoaded(){ const m=await saveStat(); if(m) lastMtime=m; }
+
+// re-read the live save and update the view in place. quiet=true suppresses the
+// error banner (used by the background auto-refresh, e.g. during a mid-write read).
+async function onRefresh(quiet=false){
+  if(refreshing) return;
   const slotIndex=+el("slotSelect").value;
   if(Number.isNaN(slotIndex)) return;
   const btn=el("refreshBtn"), label="↻ Refresh from disk";
-  btn.disabled=true; btn.textContent="↻ Reading…";
+  refreshing=true; btn.disabled=true; btn.textContent="↻ Reading…";
   try{
     const buf=await currentBytes();
     if(!buf){                                    // no live source -> fall back to re-picking
-      btn.textContent=label; btn.disabled=false;
+      btn.textContent=label; btn.disabled=false; refreshing=false;
       return HAS_FS ? pickFile() : el("savefile").click();
     }
     if(!buffer_equal(buf.slice(0,4), new Int8Array([66,78,68,52]))) throw new Error("file is no longer a valid save");
     FILE_BUF=buf;
     buildModel(parseSlot(slotIndex));
     render();   // keeps expanded regions + current filters
+    lastMtime=(await saveStat())||lastMtime;
     el("refreshedAt").textContent="refreshed "+new Date().toLocaleTimeString();
     btn.textContent="✓ Updated"; setTimeout(()=>{btn.textContent=label;},1200);
   }catch(err){
-    console.error(err); showError("Refresh failed: "+err.message); btn.textContent=label;
-  }finally{ btn.disabled=false; }
+    console.error(err); if(!quiet) showError("Refresh failed: "+err.message); btn.textContent=label;
+  }finally{ btn.disabled=false; refreshing=false; }
+}
+
+// poll the save's mtime; only do a full re-read when it actually changed
+async function autoTick(){
+  if(!UI.auto || refreshing || !(helperPath||fileHandle)) return;
+  const m=await saveStat();
+  if(m && m!==lastMtime) await onRefresh(true);
+}
+function setAuto(on){
+  UI.auto=on;
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  if(on){
+    autoTimer=setInterval(autoTick,10000);   // check every 10s (cheap mtime probe)
+    el("refreshedAt").textContent="auto-refresh on — watching for saves…";
+  }
 }
 
 /* =====================================================================
@@ -616,7 +652,8 @@ async function wire(){
   el("savefile").addEventListener("change",()=>{ const f=el("savefile").files[0]; if(f){ fileHandle=null; helperPath=null; ingestFile(f); } });
   el("saveSource").addEventListener("change",e=>loadFromHelper(e.target.value));
   el("reloadLast").addEventListener("click",reloadLast);
-  el("refreshBtn").addEventListener("click",onRefresh);
+  el("refreshBtn").addEventListener("click",()=>onRefresh());
+  el("tglAuto").addEventListener("change",e=>setAuto(e.target.checked));
   el("slotSelect").addEventListener("change",()=>{ el("calculate").hidden=false; });
   el("calculate").addEventListener("click",onCalculate);
 

@@ -86,6 +86,18 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/api/saves":
             return self._json({"saves": find_saves()})
+        if parsed.path == "/api/stat":
+            qs = urllib.parse.parse_qs(parsed.query)
+            path = (qs.get("path") or [""])[0]
+            if not path:
+                saves = find_saves()
+                if not saves:
+                    return self._json({"error": "no save found"}, 404)
+                path = saves[0]["path"]
+            if not is_allowed(path) or not os.path.isfile(path):
+                return self._json({"error": "not allowed"}, 403)
+            st = os.stat(path)
+            return self._json({"mtime": int(st.st_mtime * 1000), "size": st.st_size})
         if parsed.path == "/api/save":
             qs = urllib.parse.parse_qs(parsed.query)
             path = (qs.get("path") or [""])[0]

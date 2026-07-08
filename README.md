@@ -34,6 +34,10 @@ save (rest at a grace, quit to menu, beat a boss), click it and the view updates
 expanded regions and filters stay exactly as they were. With `start.bat` / `server.py` this works in
 **every browser, including Firefox and Zen**, because the local helper re-reads the file for you.
 
+Tick **Auto** next to it and the tracker watches the save for you — every 10 s it does a cheap
+modified-time check and only re-reads when the game has actually written a new save. So you can leave
+it on a second monitor and it updates itself as you play.
+
 If you instead open the app as a plain static page in **Chrome or Edge** (no helper), it falls back to
 the browser's File System Access API: you pick the file once, then the same Refresh button — plus a
 **↻ Reload last save** shortcut on return — works from there.

@@ -86,7 +86,10 @@
       </div>
       <div class="ctrl" id="refreshCtrl" hidden>
         <span class="ctrl-label">Live save</span>
-        <button id="refreshBtn" class="mini refresh" title="Re-read the save file from disk and update the view">↻ Refresh from disk</button>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button id="refreshBtn" class="mini refresh" title="Re-read the save file from disk and update the view">↻ Refresh from disk</button>
+          <label class="chk" title="Automatically re-read the save whenever the game writes it"><input type="checkbox" id="tglAuto" /> Auto</label>
+        </div>
         <span id="refreshedAt" class="muted small"></span>
       </div>
     </div>

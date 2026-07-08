@@ -9,38 +9,40 @@ tears and quantifiable collectibles.
 
 ### Easiest (Windows)
 
-**Double-click `start.bat`.** It launches a small local web server and opens the tracker in your
-default browser automatically. Keep the little black window open while you use it, and close it when
-you're done. (Requires [Python](https://www.python.org/downloads/) — during install, tick
-*"Add Python to PATH"*.)
+**Double-click `start.bat`.** It starts a small local helper and opens the tracker in your default
+browser. The helper **auto-detects your Elden Ring save** — just pick your character and click
+**Analyze**. Keep the little black window open while you use it, and close it when you're done.
+(Requires [Python](https://www.python.org/downloads/) — during install, tick *"Add Python to PATH"*.)
 
 ### Manual (any OS)
 
-It's a static site, so you can also serve this folder yourself:
-
 ```bash
-python -m http.server 8000
+python server.py
 ```
 
-Then open <http://localhost:8000/>.
+Then open <http://localhost:8000/>. `server.py` serves the app and exposes your save locally so the
+app can auto-load and refresh it. (You can also just serve the folder statically with
+`python -m http.server 8000`, but then there's no auto-detect — you'll pick the file yourself.)
 
-Everything runs in your browser — the save file is never uploaded anywhere. Find your save at
-`%AppData%\EldenRing\<id>\ER0000.sl2`.
+Everything runs on your machine — the save is never uploaded anywhere; the helper binds to
+`localhost` only. Saves live at `%AppData%\EldenRing\<id>\ER0000.sl2`.
 
 ## Updating as you play (Refresh)
 
-In **Chrome or Edge**, once you've picked your save a **↻ Refresh from disk** button appears in the
-controls bar. After the game writes a new save (rest at a grace, quit to menu, etc.), click it and
-the view updates in place — no need to re-open the file. Your expanded regions and filters stay put.
-The chosen file is also remembered, so on your next visit a **↻ Reload last save** button lets you
-jump back in with one click (the browser asks once for read permission).
+Once analyzed, a **↻ Refresh from disk** button sits in the controls bar. After the game writes a new
+save (rest at a grace, quit to menu, beat a boss), click it and the view updates in place — your
+expanded regions and filters stay exactly as they were. With `start.bat` / `server.py` this works in
+**every browser, including Firefox and Zen**, because the local helper re-reads the file for you.
 
-Firefox and Safari don't support this API yet, so there you'll re-pick the file to update.
+If you instead open the app as a plain static page in **Chrome or Edge** (no helper), it falls back to
+the browser's File System Access API: you pick the file once, then the same Refresh button — plus a
+**↻ Reload last save** shortcut on return — works from there.
 
 ## Layout
 
 ```
-start.bat             – double-click launcher (starts the server + opens the browser)
+start.bat             – double-click launcher (Windows): runs server.py
+server.py             – local helper: serves the app + auto-detects/serves your save
 index.html            – the app
 assets/app.js         – save parsing + model + rendering (vanilla JS, no dependencies)
 assets/style.css      – styling

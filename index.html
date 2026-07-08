@@ -17,6 +17,10 @@
   <!-- ============ UPLOAD ============ -->
   <section id="uploadSection" class="panel">
     <div class="upload-row">
+      <div id="saveSourceWrap" class="slot-wrap" hidden>
+        <label for="saveSource">Save file</label>
+        <select id="saveSource"></select>
+      </div>
       <button id="pickBtn" class="file-btn">Choose save file (ER0000.sl2)</button>
       <input type="file" id="savefile" accept=".sl2,.co2" hidden />
       <button id="reloadLast" class="file-btn alt" hidden>↻ Reload last save</button>
@@ -26,6 +30,7 @@
         <button id="calculate" class="go-btn" hidden>Analyze ▸</button>
       </div>
     </div>
+    <p id="autoNote" class="hint-line" hidden></p>
     <p class="hint-line">Your save is read <strong>entirely in your browser</strong> — nothing is uploaded anywhere. Find it at
       <code>%AppData%\EldenRing\&lt;id&gt;\ER0000.sl2</code>.</p>
     <p id="loadError" class="error" hidden></p>

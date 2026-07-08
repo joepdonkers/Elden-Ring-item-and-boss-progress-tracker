@@ -19,22 +19,10 @@ if not defined PYCMD (
   exit /b
 )
 
-echo.
-echo   Elden Ring - Ultimate Region Tracker
-echo   ------------------------------------
-echo   Opening http://localhost:8000/ in your browser...
-echo.
-echo   KEEP THIS WINDOW OPEN while you use the tracker.
-echo   Close it (or press Ctrl+C) when you're done to stop the server.
-echo.
+REM start the helper server (it auto-detects your save and opens the browser itself)
+%PYCMD% server.py
 
-REM open the browser a couple seconds after the server starts
-start "" cmd /c "timeout /t 2 >nul & start http://localhost:8000/"
-
-REM start the local web server (this window stays running)
-%PYCMD% -m http.server 8000
-
-REM if the server exits/fails (e.g. port already in use), pause so the message is readable
+REM if the server exits/fails, pause so the message is readable
 echo.
 echo   The server has stopped.
 pause

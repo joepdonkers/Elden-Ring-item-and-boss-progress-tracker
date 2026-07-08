@@ -57,6 +57,16 @@ data/region_map.json  – canonical region order + grace-subcategory -> region m
 data/generate_boss_meta.py – regenerates the two data/ files from assets/json
 ```
 
+## Story / critical path
+
+The bosses you must beat to finish the game are marked with a gold **★** and a short note (e.g.
+"Great Rune — need any 2 to enter Leyndell", "lets you burn the Erdtree"). Each region header shows a
+**★ done/total** badge so you can see at a glance what main-story fights remain there, and the
+**★ Story only** toggle hides everything except the critical path. Two Great Runes are required to
+enter Leyndell — Godrick + Rennala is the marked pair, but any two Shardbearers work. The set is
+defined in `data/generate_boss_meta.py` (the `ESSENTIAL` table) and stored per boss in
+`boss_meta.json`.
+
 ## How it works
 
 - **Save parsing** (`assets/app.js`) reads both inventory item IDs and event flags in a single

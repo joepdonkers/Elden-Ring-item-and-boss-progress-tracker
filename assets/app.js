@@ -14,7 +14,7 @@ let FILE_BUF = null;          // ArrayBuffer of the whole save
 let DB = {};                  // all loaded json
 let MODEL = null;             // assembled { regions:{}, misc:{}, collectibles:[] }
 let isDlcFile = false;        // set during inventory parse (8 vs 16 byte chunks)
-const UI = { filter:"all", sort:"default", q:"", reveal:true, auto:false,
+const UI = { filter:"all", sort:"default", q:"", reveal:true, auto:false, essentialOnly:false,
              cats:{bosses:true, graces:true, items:true},
              base:true, dlc:true };
 
@@ -109,7 +109,7 @@ function flagOwned(event_flags, flagId){
  *  DATA LOADING  (handles UTF-8 and UTF-16 json transparently)
  * ===================================================================== */
 async function loadJson(url){
-  const buf=await (await fetch(url)).arrayBuffer();
+  const buf=await (await fetch(url,{cache:"no-store"})).arrayBuffer();
   const b=new Uint8Array(buf); let text;
   if(b[0]===0xFF&&b[1]===0xFE) text=new TextDecoder("utf-16le").decode(b);
   else if(b[0]===0xFE&&b[1]===0xFF) text=new TextDecoder("utf-16be").decode(b);
@@ -207,7 +207,8 @@ function buildModel(parsed){
     const meta=DB.boss_meta[id]||{};
     region(meta.region||"Other").bosses.push({
       name:b.name, location:meta.location||meta.zone||"", zone:meta.zone||"",
-      defeated:flagOwned(event_flags,id), wiki:bossWikiURL(b.name)
+      defeated:flagOwned(event_flags,id), wiki:bossWikiURL(b.name),
+      essential:!!meta.essential, essentialNote:meta.essentialNote||""
     });
   }
   // ---- graces ----
@@ -274,10 +275,12 @@ function sortEntries(arr,doneKey,nameKey){
 
 function bossEntry(b){
   const cls=b.defeated?"done":"todo";
-  const loc=b.location?`<span class="loc">${b.location}</span>`:"";
-  return `<div class="entry ${cls}">
+  const star=b.essential?`<span class="star" title="Required to finish the game">★</span> `:"";
+  const line=b.essential&&b.essentialNote ? b.essentialNote : b.location;
+  const loc=line?`<span class="loc">${line}</span>`:"";
+  return `<div class="entry ${cls}${b.essential?" essential":""}">
     <span class="state ${b.defeated?"y":"n"}">${b.defeated?"✔":"○"}</span>
-    <span class="nm"><a href="${b.wiki}" target="_blank" rel="noopener">${b.name}</a>${loc}</span>
+    <span class="nm">${star}<a href="${b.wiki}" target="_blank" rel="noopener">${b.name}</a>${loc}</span>
   </div>`;
 }
 function graceEntry(g){
@@ -321,6 +324,8 @@ function renderRegion(R){
   const [bd,bt]=countPair(bossArr,"defeated");
   const [gd,gt]=countPair(graceArr,"found");
   const [idn,itt]=countPair(itemArr,"owned");
+  const essArr=bossArr.filter(b=>b.essential);
+  const [ed,et]=countPair(essArr,"defeated");   // story / critical-path bosses in this region
 
   let done=0,total=0;
   if(UI.cats.bosses){done+=bd;total+=bt;}
@@ -330,20 +335,23 @@ function renderRegion(R){
 
   // build body sections
   let body="";
-  // bosses
+  // bosses (essential-first when sorting by default, so story bosses stand out)
   if(UI.cats.bosses && bt){
-    const list=sortEntries(bossArr.filter(b=>passFilter(b.defeated)&&matchQ(b.name)),"defeated","name");
-    if(list.length) body+=`<div class="subsec"><h3>Bosses <span class="c">${bd}/${bt}</span></h3>
+    let list=bossArr.filter(b=>(!UI.essentialOnly||b.essential)&&passFilter(b.defeated)&&matchQ(b.name));
+    list=sortEntries(list,"defeated","name");
+    if(UI.sort==="default") list.sort((a,b)=>(b.essential?1:0)-(a.essential?1:0));
+    const cnt=UI.essentialOnly?`${ed}/${et}`:`${bd}/${bt}`;
+    if(list.length) body+=`<div class="subsec"><h3>Bosses <span class="c">${cnt}</span></h3>
       <div class="rows">${list.map(bossEntry).join("")}</div></div>`;
   }
-  // graces
-  if(UI.cats.graces && gt){
+  // graces (none are essential, so hidden in essential-only view)
+  if(UI.cats.graces && gt && !UI.essentialOnly){
     const list=sortEntries(graceArr.filter(g=>passFilter(g.found)&&matchQ(g.name)),"found","name");
     if(list.length) body+=`<div class="subsec"><h3>Sites of Grace <span class="c">${gd}/${gt}</span></h3>
       <div class="rows">${list.map(graceEntry).join("")}</div></div>`;
   }
-  // items (grouped by zone)
-  if(UI.cats.items && itt){
+  // items (grouped by zone; hidden in essential-only view)
+  if(UI.cats.items && itt && !UI.essentialOnly){
     let zoneHtml="";
     const zoneNames=Object.keys(R.zones).sort();
     for(const z of zoneNames){
@@ -361,6 +369,7 @@ function renderRegion(R){
   if(!body) return ""; // nothing matches current filter -> hide region entirely
 
   const badges=[];
+  if(et) badges.push(`<span class="badge story ${ed===et?"full":""}" title="Story / critical-path bosses">★ ${ed}/${et}</span>`);
   if(bt) badges.push(`<span class="badge ${bd===bt?"full":""}">⚔ ${bd}/${bt}</span>`);
   if(gt) badges.push(`<span class="badge ${gd===gt?"full":""}">✦ ${gd}/${gt}</span>`);
   if(itt) badges.push(`<span class="badge ${idn===itt?"full":""}">🎒 ${idn}/${itt}</span>`);
@@ -377,6 +386,7 @@ function renderRegion(R){
 }
 
 function renderMisc(){
+  if(UI.essentialOnly) return "";   // nothing here is on the critical path
   // collectibles + flag/inventory categories, as a global block
   let inner="";
   // quantifiable collectibles
@@ -665,6 +675,7 @@ async function wire(){
   el("filterSel").addEventListener("change",e=>{UI.filter=e.target.value;render();});
   el("sortSel").addEventListener("change",e=>{UI.sort=e.target.value;render();});
   el("tglReveal").addEventListener("change",e=>{UI.reveal=e.target.checked;render();});
+  el("tglEssential").addEventListener("change",e=>{UI.essentialOnly=e.target.checked;render();});
   let t; el("searchBox").addEventListener("input",e=>{
     clearTimeout(t); t=setTimeout(()=>{UI.q=e.target.value.trim().toLowerCase();render();},150);
   });

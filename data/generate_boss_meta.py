@@ -187,6 +187,23 @@ def last_paren_location(name):
             return p.strip()
     return ''
 
+# Critical-path bosses that must be beaten to finish the game (standard route).
+# Two Great Runes are needed to enter Leyndell; Godrick + Rennala is the common
+# pair, but any two Shardbearers work (Radahn, Rykard, Mohg, Malenia).
+ESSENTIAL = {
+ '10000850':'Story - gate to Stormveil Castle',
+ '10000800':'Story - Great Rune (need any 2 to enter Leyndell)',
+ '14000850':'Story - guards Rennala (Raya Lucaria route)',
+ '14000800':'Story - Great Rune (need any 2 to enter Leyndell)',
+ '11000800':'Story - opens the road to the Mountaintops',
+ '1252520800':'Story - lets you burn the Erdtree',
+ '13000850':'Story - blocks the path in Farum Azula',
+ '13000800':'Story - triggers the Erdtree burning',
+ '11050850':'Story - blocks Ashen Leyndell',
+ '11050800':'Story - penultimate boss',
+ '19000800':'Story - final boss',
+}
+
 # ---- auto-seed bosses ----
 seed = {}
 via_override=via_grace=via_paren=via_hint=0; unmatched = []
@@ -208,7 +225,8 @@ for bid,b in list(bosses.items())+list(dlc_bosses.items()):
         unmatched.append((bid,name)); reg=''
     if not loc:
         loc = (zone + (', '+reg if zone and zone!=reg else '')) if zone else (last_paren_location(name) or reg)
-    seed[bid] = {'name':name,'region':reg,'zone':zone or '','location':loc}
+    seed[bid] = {'name':name,'region':reg,'zone':zone or '','location':loc,
+                 'essential': bid in ESSENTIAL, 'essentialNote': ESSENTIAL.get(bid,'')}
 
 print('TOTAL:',len(seed),'| override:',via_override,'paren:',via_paren,'grace:',via_grace,'hint:',via_hint,'| UNMATCHED:',len(unmatched))
 for bid,name in unmatched: print('   UNSET',bid,'|',name)

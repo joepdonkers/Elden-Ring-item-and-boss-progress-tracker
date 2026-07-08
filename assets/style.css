@@ -107,6 +107,13 @@ select,input[type=search]{background:var(--bg2);color:var(--text);border:1px sol
 .state{font-size:1rem;flex:none}
 .state.y{color:var(--green)}.state.n{color:var(--red)}
 .entry.hideitem{display:none}
+/* essential / critical-path bosses */
+.entry.essential{border-color:var(--gold);box-shadow:inset 0 0 0 1px rgba(201,164,76,.35),0 0 10px rgba(201,164,76,.12)}
+.entry.essential.todo{background:linear-gradient(180deg,#2a2313,#211c12)}
+.star{color:var(--gold);font-size:.9em}
+.ess-note{color:var(--gold-soft)!important}
+.badge.story{border-color:var(--gold);color:var(--gold-soft)}
+.badge.story.full{color:var(--green);border-color:var(--green)}
 
 /* item hint tooltip */
 .tip{position:relative}
